@@ -1,0 +1,8 @@
+{
+  "name": "meetup ansible",
+  "image": "alpine/ansible",
+  "containerEnv": {
+    "ANSIBLE_CONFIG": "${containerWorkspaceFolder}/ansible/ansible.cfg"
+  },
+  "postCreateCommand": "apk add --no-cache git py3-netaddr kubectl k9s helm flux nano vim && cd ansible && sh prepare.sh"
+}

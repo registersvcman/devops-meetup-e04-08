@@ -1,0 +1,6 @@
+image:
+  # Set by CI: ghcr.io/<owner>/<repo>/front of the fork the workflow runs in.
+  repository: ""
+  tag: latest
+
+host: front.ops08.erix.me

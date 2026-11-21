@@ -1,0 +1,80 @@
+- name: Deploy RKE2
+  hosts:
+    - masters
+    - workers
+  vars:
+    # Pinned: the role default is v1.25, and Flux needs Kubernetes >= 1.33.
+    rke2_version: v1.36.5+rke2r1
+    # Download kubeconfig straight into root's ~/.kube/config on the controller
+    # (the dev container), so kubectl/k9s work with no KUBECONFIG export.
+    rke2_download_kubeconf: true
+    rke2_download_kubeconf_path: "{{ lookup('env', 'HOME') }}/.kube"
+    rke2_download_kubeconf_file_name: config
+    # Make the API server cert valid for the master's FQDN (for external kubectl).
+    # rke2_api_ip is left at its default (node internal IP) so cluster
+    # registration over the internal network is unchanged.
+    rke2_additional_sans:
+      - "{{ groups['masters'][0] }}"
+    # Pinned: the role default switches to traefik in role release 1.52.0,
+    # and the ClusterIssuer below uses class nginx.
+    rke2_ingress_controller: ingress-nginx
+  pre_tasks:
+    - name: Install apparmor (required by rke2)
+      ansible.builtin.apt:
+        name: apparmor
+        update_cache: true
+
+    - name: Ensure ~/.kube exists on the controller
+      delegate_to: localhost
+      run_once: true
+      ansible.builtin.file:
+        path: "{{ lookup('env', 'HOME') }}/.kube"
+        state: directory
+        mode: "0700"
+  roles:
+    - role: lablabs.rke2
+  post_tasks:
+    - name: Point kubeconfig at the master FQDN
+      delegate_to: localhost
+      run_once: true
+      ansible.builtin.replace:
+        path: "{{ lookup('env', 'HOME') }}/.kube/config"
+        regexp: 'https://(127\.0\.0\.1|[0-9.]+):6443'
+        replace: "https://{{ groups['masters'][0] }}:6443"
+
+    # RKE2 applies everything in server/manifests, also files added later;
+    # its helm-controller installs the chart from the HelmChart resource.
+    - name: Add cert-manager and the Let's Encrypt issuer to RKE2 manifests
+      when: inventory_hostname in groups['masters']
+      ansible.builtin.copy:
+        dest: /var/lib/rancher/rke2/server/manifests/cert-manager.yaml
+        mode: "0644"
+        content: |
+          apiVersion: helm.cattle.io/v1
+          kind: HelmChart
+          metadata:
+            name: cert-manager
+            namespace: kube-system
+          spec:
+            repo: https://charts.jetstack.io
+            chart: cert-manager
+            targetNamespace: cert-manager
+            createNamespace: true
+            valuesContent: |-
+              crds:
+                enabled: true
+          ---
+          apiVersion: cert-manager.io/v1
+          kind: ClusterIssuer
+          metadata:
+            name: letsencrypt
+          spec:
+            acme:
+              server: https://acme-v02.api.letsencrypt.org/directory
+              email: devops-4@erix.me
+              privateKeySecretRef:
+                name: letsencrypt-account-key
+              solvers:
+                - http01:
+                    ingress:
+                      ingressClassName: nginx
