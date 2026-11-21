@@ -12,6 +12,9 @@ jobs:
    runs-on: team-01
    steps:
      - uses: actions/setup-node@v7
+       with:
+         node-version: 24
+
      - uses: actions/checkout@v7
      - env:
          ANTHROPIC_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
