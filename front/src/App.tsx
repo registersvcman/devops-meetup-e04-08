@@ -1,14 +1,46 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import heroImg from './assets/hero.png'
 import reactLogo from './assets/react.svg'
 import viteLogo from './assets/vite.svg'
 import './App.css'
 
+type Theme = 'light' | 'dark'
+
+function getInitialTheme(): Theme {
+  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
+}
+
 function App() {
   const [count, setCount] = useState(0)
+  const [theme, setTheme] = useState<Theme>(getInitialTheme)
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+  }, [theme])
+
+  const nextTheme: Theme = theme === 'dark' ? 'light' : 'dark'
+
+  const toggleTheme = () => {
+    setTheme(nextTheme)
+    try {
+      localStorage.setItem('theme', nextTheme)
+    } catch {
+      // Storage may be unavailable (e.g. private mode); theme still applies.
+    }
+  }
 
   return (
     <>
+      <button
+        type="button"
+        className="theme-toggle"
+        onClick={toggleTheme}
+        aria-label={`Switch to ${nextTheme} theme`}
+        title={`Switch to ${nextTheme} theme`}
+      >
+        {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+      </button>
+
       <section id="center">
         <div className="hero">
           <img src={heroImg} className="base" width="170" height="179" alt="" />
